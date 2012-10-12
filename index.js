@@ -37,7 +37,7 @@ var readTargetsFile = function(cb) {
         console.error('targets.json parse failed:', e);
         cb(e);
     }
-    
+
     try {
       targets = validateTargets(JSON.parse(json)));
       cb(null);
@@ -72,7 +72,7 @@ function onConnection(stream) {
   stream.prehostBuffers = [];
   stream.prehostLength = 0;
   stream.hostProgress = 0;
-  
+
   stream.on('data', onPrehostData);
 }
 
@@ -106,10 +106,10 @@ var URI_TOO_LONG_ERROR = httpResponse(414, "URI Too Long");
 
 function onPrehostData(buffer) {
   var requestorStream = this;
-  
+
   this.prehostBuffers.push(buffer);
   this.prehostLength += buffer.length;
-  
+
   var bufferIdx = 0;
   if (!this.hostStart) {
     // Note: this method only works because there are no duplicate characters in the
@@ -122,15 +122,15 @@ function onPrehostData(buffer) {
       }
       bufferIdx++;
     }
-    
+
     if (this.hostProgress == hostChars.length) {
-      this.hostStart = { 
+      this.hostStart = {
         buffer: this.prehostBuffers.length-1,
         index: bufferIdx
       }
     }
   }
-  
+
   if (this.hostStart) {
     while (bufferIdx < buffer.length) {
       if (buffer[bufferIdx] == endHostChar) {
@@ -143,30 +143,30 @@ function onPrehostData(buffer) {
       bufferIdx++;
     }
   }
-  
+
   if (this.hostStart && this.hostEnd) {
     var host = stringBetween(this.prehostBuffers, this.hostStart, this.hostEnd);
     var target = targets[host];
     console.log('host:', host);
     if (!target) {
       console.error('Invalid target: ' + host);
-      
+
       requestorStream.end(HOST_NOT_FOUND_ERROR);
       return;
     }
-    
+
     var targetStream = net.connect(target.port, target.host);
-    
+
     requestorStream.removeListener('data', onPrehostData);
-    
+
     requestorStream.pipe(targetStream);
     targetStream.pipe(requestorStream);
-    
+
     requestorStream.prehostBuffers.forEach(function(buffer) {
       targetStream.write(buffer);
     });
-    
-    
+
+
   } else {
     if (this.prehostLength > PREHOST_MAX_LENGTH) {
       console.log('Shutting down stream for exceeding ', PREHOST_MAX_LENGTH);
