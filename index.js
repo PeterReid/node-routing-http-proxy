@@ -149,20 +149,21 @@ function onPrehostData(buffer) {
   if (!this.hostStart) {
     // Note: this method only works because there are no duplicate characters in the
     // host marker.
-    while (bufferIdx < buffer.length && this.hostProgress < hostChars.length) {
+    while (bufferIdx < buffer.length) {
       if (buffer[bufferIdx] === hostChars[this.hostProgress]) {
         this.hostProgress++;
-      } else {
+        if (this.hostProgress == hostChars.length) {
+          bufferIdx++; // Point to first character of host, not the space in ": "
+          this.hostStart = {
+            buffer: this.prehostBuffers.length-1,
+            index: bufferIdx
+          }
+          break;
+        }
+      } else if (this.hostProgress > 0) {
         this.hostProgress = buffer[bufferIdx]==hostChars[0] ? 1 : 0;
       }
       bufferIdx++;
-    }
-
-    if (this.hostProgress == hostChars.length) {
-      this.hostStart = {
-        buffer: this.prehostBuffers.length-1,
-        index: bufferIdx
-      }
     }
   }
 
