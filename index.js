@@ -88,6 +88,7 @@ var hostChars = toCharCodes('\r\nHost: ');
 var endHostChar = '\r'.charCodeAt(0);
 
 function stringBetween(buffers, start, end) {
+  console.log(start,end);
   var result = '';
   for (var b = start.buffer; b <= end.buffer; b++) {
     var indexLow = b == start.buffer ? start.index : 0;
@@ -154,20 +155,18 @@ function onPrehostData(buffer) {
       return;
     }
     
-    var targetStream = net.connect(target.port, target.host)
-      .on('error', function(err) {
-        console.error('Error from targetStream (' + host + '):', err);
-        requestorStream.end();
-      });
-    
-    requestorStream.prehostBuffers.forEach(function(buffer) {
-      targetStream.write(buffer);
-    });
+    var targetStream = net.connect(target.port, target.host);
     
     requestorStream.removeListener('data', onPrehostData);
     
     requestorStream.pipe(targetStream);
     targetStream.pipe(requestorStream);
+    
+    requestorStream.prehostBuffers.forEach(function(buffer) {
+      targetStream.write(buffer);
+    });
+    
+    
   } else {
     if (this.prehostLength > PREHOST_MAX_LENGTH) {
       console.log('Shutting down stream for exceeding ', PREHOST_MAX_LENGTH);
