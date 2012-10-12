@@ -147,6 +147,8 @@ function onPrehostData(buffer) {
 
   var bufferIdx = 0;
   if (!this.hostStart) {
+    // Look for the beginning of the Host line.
+    //
     // Note: this method only works because there are no duplicate characters in the
     // host marker.
     while (bufferIdx < buffer.length) {
@@ -168,6 +170,7 @@ function onPrehostData(buffer) {
   }
 
   if (this.hostStart) {
+    // Now see if we can find the \r that ends the "Host: " line.
     while (bufferIdx < buffer.length) {
       if (buffer[bufferIdx] == endHostChar) {
         this.hostEnd = {
@@ -180,7 +183,7 @@ function onPrehostData(buffer) {
     }
   }
 
-  if (this.hostStart && this.hostEnd) {
+  if (this.hostEnd) { // (implies this.hostStart) 
     var host = stringBetween(this.prehostBuffers, this.hostStart, this.hostEnd);
     var target = targets[host];
 
