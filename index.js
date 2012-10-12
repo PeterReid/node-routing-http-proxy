@@ -48,6 +48,33 @@ var readTargetsFile = function(cb) {
   });
 }
 */
+
+/* Throttled console.error, since it is blocking */
+var reportError = (function() {
+  var windowChange;
+  var inWindow = 0;
+  var dropped = 0;
+  return function() {
+    if (!windowChange) {
+      windowChange = setTimeout(function() {
+        if (dropped > 0) {
+          console.error(dropped + ' error messages dropped to prevent spray.');
+        }
+        inWindow = 0;
+        dropped = 0;
+        windowChange = null;
+      }, 100);
+    }
+
+    inWindow++;
+    if (inWindow > 5) {
+      dropped++;
+    } else {
+      console.error.apply(console, arguments);
+    }
+  }
+})();
+
 var targets = {
   'localproxy.flightvector.com': {
     host: '127.0.0.1',
@@ -62,6 +89,14 @@ var targets = {
     port: 8082
   },
   'map.flightvector.com': {
+    host: '127.0.0.1',
+    port: 8083
+  },
+  '127.0.0.2': {
+    host: '127.0.0.1',
+    port: 8082
+  },
+  '127.0.0.3': {
     host: '127.0.0.1',
     port: 8083
   }
@@ -88,7 +123,6 @@ var hostChars = toCharCodes('\r\nHost: ');
 var endHostChar = '\r'.charCodeAt(0);
 
 function stringBetween(buffers, start, end) {
-  console.log(start,end);
   var result = '';
   for (var b = start.buffer; b <= end.buffer; b++) {
     var indexLow = b == start.buffer ? start.index : 0;
@@ -147,16 +181,18 @@ function onPrehostData(buffer) {
   if (this.hostStart && this.hostEnd) {
     var host = stringBetween(this.prehostBuffers, this.hostStart, this.hostEnd);
     var target = targets[host];
-    console.log('host:', host);
+
     if (!target) {
-      console.error('Invalid target: ' + host);
+      reportError('Invalid target: ' + host);
 
       requestorStream.end(HOST_NOT_FOUND_ERROR);
       return;
     }
 
     var targetStream = net.connect(target.port, target.host);
-
+    targetStream.on('error', function(err) {
+      reportError('Target stream to ' + target.host + ':' + target.port + ' failed.');
+    });
     requestorStream.removeListener('data', onPrehostData);
 
     requestorStream.pipe(targetStream);
@@ -169,7 +205,7 @@ function onPrehostData(buffer) {
 
   } else {
     if (this.prehostLength > PREHOST_MAX_LENGTH) {
-      console.log('Shutting down stream for exceeding ', PREHOST_MAX_LENGTH);
+      reportError('Shutting down stream for exceeding ', PREHOST_MAX_LENGTH);
       requestorStream.end(URI_TOO_LONG_ERROR);
       requestorStream.removeListener('data', onPrehostData);
     }
