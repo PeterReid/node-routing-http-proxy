@@ -137,6 +137,7 @@ function httpResponse(code, message) {
 }
 var HOST_NOT_FOUND_ERROR = httpResponse(404, "Host Not Found");
 var URI_TOO_LONG_ERROR = httpResponse(414, "URI Too Long");
+var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
 
 function onPrehostData(buffer) {
   var requestorStream = this;
@@ -190,8 +191,13 @@ function onPrehostData(buffer) {
     }
 
     var targetStream = net.connect(target.port, target.host);
+    var gotSomeFromTarget = false;
     targetStream.on('error', function(err) {
       reportError('Target stream to ' + target.host + ':' + target.port + ' failed.');
+      requestorStream.end(gotSomeFromTarget ? '' : TARGET_FAILED);
+    });
+    targetStream.once('data', function() {
+      gotSomeFromTarget = true;
     });
     requestorStream.removeListener('data', onPrehostData);
 
