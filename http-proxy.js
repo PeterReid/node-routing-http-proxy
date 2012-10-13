@@ -16,6 +16,11 @@ var HOST_NOT_FOUND_ERROR = httpResponse(404, "Host Not Found");
 var URI_TOO_LONG_ERROR = httpResponse(414, "URI Too Long");
 var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
 
+/*
+ * targetStreamCb :: host -> stream?
+ *   Provide an output stream for the given request. May return null.
+ *   'this' is set to the the input stream
+ */ 
 RoutingHttpProxy = module.exports = function(targetStreamCb) {
   EventEmitter.call(this);
   
@@ -28,9 +33,6 @@ util.inherits(RoutingHttpProxy, EventEmitter)
  * 
  * stream :: Stream
  *   readable stream that will send HTTP
- * targetCb :: (host, uri) -> stream?
- *   Provide an output stream for the given request. May return null.
- *   'this' is set to the the input stream
  */
 RoutingHttpProxy.prototype.proxy = function(stream) {
   stream.httpParser = new HttpParser();
