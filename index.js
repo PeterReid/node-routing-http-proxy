@@ -103,9 +103,7 @@ var targets = {
 };
 
 function onConnection(stream) {
-  stream.prehostBuffers = [];
-  stream.prehostLength = 0;
-  stream.hostProgress = 0;
+  stream.httpParser = new HttpParser();
 
   stream.on('data', onPrehostData);
 }
@@ -121,29 +119,23 @@ function toCharCodes(str) {
 var hostChars = toCharCodes('\r\nHost: ');
 var endHostChar = '\r'.charCodeAt(0);
 
-function stringBetween(buffers, start, end) {
-  var result = '';
-  for (var b = start.buffer; b <= end.buffer; b++) {
-    var indexLow = b == start.buffer ? start.index : 0;
-    var indexHigh = b == end.buffer ? end.index : buffers[b].length;
-    result += buffers[b].slice(indexLow, indexHigh);
-  }
-  return result;
+function BufferIndex(buffer, index) {
+  this.buffer = buffer;
+  this.index = index;
 }
 
-function httpResponse(code, message) {
-  return 'HTTP/1.1 ' + code + ' ' + message + '\r\n\r\n' + message;
+function HttpParser() {
+  this.prehostBuffers = [];
+  this.prehostLength = 0;
+  this.hostProgress = 0;
+  this.hostStart = null;
+  this.host = null;
 }
-var HOST_NOT_FOUND_ERROR = httpResponse(404, "Host Not Found");
-var URI_TOO_LONG_ERROR = httpResponse(414, "URI Too Long");
-var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
 
-function onPrehostData(buffer) {
-  var requestorStream = this;
-
+HttpParser.prototype.advance = function(buffer) {
   this.prehostBuffers.push(buffer);
   this.prehostLength += buffer.length;
-
+  
   var bufferIdx = 0;
   if (!this.hostStart) {
     // Look for the beginning of the Host line.
@@ -155,10 +147,7 @@ function onPrehostData(buffer) {
         this.hostProgress++;
         if (this.hostProgress == hostChars.length) {
           bufferIdx++; // Point to first character of host, not the space in ": "
-          this.hostStart = {
-            buffer: this.prehostBuffers.length-1,
-            index: bufferIdx
-          }
+          this.hostStart = new BufferIndex(this.prehostBuffers.length-1, bufferIdx);
           break;
         }
       } else if (this.hostProgress > 0) {
@@ -172,22 +161,43 @@ function onPrehostData(buffer) {
     // Now see if we can find the \r that ends the "Host: " line.
     while (bufferIdx < buffer.length) {
       if (buffer[bufferIdx] == endHostChar) {
-        this.hostEnd = {
-          buffer: this.prehostBuffers.length-1,
-          index: bufferIdx
-        }
+        this.host = this.stringBetween(this.hostStart, 
+          new BufferIndex(this.prehostBuffers.length-1, bufferIdx));
         break;
       }
       bufferIdx++;
     }
   }
+};
 
-  if (this.hostEnd) { // (implies this.hostStart) 
-    var host = stringBetween(this.prehostBuffers, this.hostStart, this.hostEnd);
-    var target = targets[host];
+HttpParser.prototype.stringBetween = function(start, end) {
+  var result = '';
+  for (var b = start.buffer; b <= end.buffer; b++) {
+    var buffer = this.prehostBuffers[b];
+    var indexLow = b == start.buffer ? start.index : 0;
+    var indexHigh = b == end.buffer ? end.index : buffer.length;
+    result += buffer.slice(indexLow, indexHigh);
+  }
+  return result;
+};
+
+function httpResponse(code, message) {
+  return 'HTTP/1.1 ' + code + ' ' + message + '\r\n\r\n' + message;
+}
+var HOST_NOT_FOUND_ERROR = httpResponse(404, "Host Not Found");
+var URI_TOO_LONG_ERROR = httpResponse(414, "URI Too Long");
+var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
+
+function onPrehostData(buffer) {
+  var requestorStream = this;
+
+  this.httpParser.advance(buffer);
+  
+  if (this.httpParser.host !== null) { 
+    var target = targets[this.httpParser.host];
 
     if (!target) {
-      reportError('Invalid target: ' + host);
+      reportError('Invalid target: ' + this.httpParser.host);
 
       requestorStream.end(HOST_NOT_FOUND_ERROR);
       return;
@@ -207,13 +217,13 @@ function onPrehostData(buffer) {
     requestorStream.pipe(targetStream);
     targetStream.pipe(requestorStream);
 
-    requestorStream.prehostBuffers.forEach(function(buffer) {
+    this.httpParser.prehostBuffers.forEach(function(buffer) {
       targetStream.write(buffer);
     });
-    delete requestorStream.prehostBuffers;
+    delete this.httpParser;
 
   } else {
-    if (this.prehostLength > PREHOST_MAX_LENGTH) {
+    if (this.httpParser.prehostLength > PREHOST_MAX_LENGTH) {
       reportError('Shutting down stream for exceeding ', PREHOST_MAX_LENGTH);
       requestorStream.end(URI_TOO_LONG_ERROR);
       requestorStream.removeListener('data', onPrehostData);
