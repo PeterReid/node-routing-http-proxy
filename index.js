@@ -103,7 +103,6 @@ var targets = {
 };
 
 function onConnection(stream) {
-  var buffered = null;
   stream.prehostBuffers = [];
   stream.prehostLength = 0;
   stream.hostProgress = 0;
