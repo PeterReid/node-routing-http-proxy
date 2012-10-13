@@ -8,6 +8,8 @@ This module's design has one drawback (for some): It is an anonymising proxy. Yo
 
 This proxy just barely pokes into HTTP-land to read the Host field of the HTTP header otherwise just pipes TLS/TCP to TCP and gets out of the way. Node's HTTP parser is not used.
 
+Websockets just work because this leaves the underlying stream alone entirely.
+
 X-Forwarded-For
 ===============
 
