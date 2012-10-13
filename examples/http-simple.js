@@ -1,6 +1,6 @@
 var net = require('net');
 var http = require('http');
-var RoutingHttpProxy = require('../http-proxy');
+var RoutingHttpProxy = require('../routing-http-proxy');
 
 // GETting http://127.0.0.1:8000 will go to port 31415
 // GETting http://127.0.0.2:8000 will go to port 27183

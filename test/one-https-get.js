@@ -4,7 +4,7 @@ var assert = require('assert');
 var tls = require('tls');
 var fs = require('fs');
 var net = require('net');
-var proxyStream = require('./http-proxy').proxyStream;
+var RoutingHttpProxy = require('../routing-http-proxy');
 
 var targetServer = http.createServer(function (req, res) {
   res.writeHead(200, {'Content-Type': 'text/plain'});
