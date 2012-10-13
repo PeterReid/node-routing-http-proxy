@@ -38,6 +38,11 @@ RoutingHttpProxy.prototype.proxy = function(stream) {
   stream.httpParser = new HttpParser();
   stream._routingHttpProxy = this;
   stream.on('data', onPrehostData);
+  stream.on('error', function(err) {
+    this.removeListener('data', onPrehostData);
+    err.message = 'Error in input stream. ' + err.message;
+    this.emit('error', err)
+  });
 }
 
 
