@@ -80,7 +80,7 @@ function onPrehostData(buffer) {
       targetStream.write(buffer);
     });
 
-    this.emit('proxy', this.httpParser.host, this.httpParser.uri, requestorStream, targetStream);
+    this.emit('proxy', this.httpParser.host, requestorStream, targetStream);
 
     delete this.httpParser;
 

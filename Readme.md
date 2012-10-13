@@ -16,3 +16,9 @@ X-Forwarded-For
 The de-facto standard for reverse proxies is to add X-Forwarded-For HTTP headers to pass on the IP address that the request is actually coming from. This proxy does *not* do that. Because multiple HTTPS connections can share a TLS connection and this proxy stops parsing the TLS connection as soon as the HTTP headers pass it by, it could not do that for any requests except the first on that connection. I figure that doing it inconsistently is worse than not doing it at all. 
 
 If you want to collect IP logs with this, you will have to either log the IP and first bytes of the HTTP request at the proxy, or send IP information out-of-band somehow. 
+
+Subdomains and Keep-Alive
+=========================
+
+One concern I had about this design was that several HTTP requests would come on the same Kept-Alive connection with different Hosts specified. Since this module stops parsing as soon as the first Host passes by, that would fundamentally break the design. However, none of the browsers I have tested (Chrome, Firefox, IE) behave like this - they use a different connection for each subdomain. The HTTP spec ( http://tools.ietf.org/html/rfc2616#section-8.1 ) doesn't explicitly specify one way or the other, as far as I can tell.
+
