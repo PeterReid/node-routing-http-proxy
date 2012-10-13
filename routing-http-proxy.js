@@ -21,7 +21,7 @@ var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
  *   Provide an output stream for the given request. May return null.
  *   'this' is set to the the input stream
  */
-RoutingHttpProxy = module.exports = function(targetStreamCb) {
+var RoutingHttpProxy = module.exports = function(targetStreamCb) {
   EventEmitter.call(this);
 
   this.targetStreamCb = targetStreamCb;
