@@ -22,17 +22,19 @@ var targets = {
   }
 };
 
-var proxyServer = tls.createServer({ // HTTPS options
-  key: fs.readFileSync('./dummy.key'),
-  cert: fs.readFileSync('./dummy.crt')
-});
-proxyServer.on('secureConnection', function(stream) {
-  proxyStream(stream, function(host, uri) {
+var routingProxy = new RoutingHttpProxy(function(host) {
     var target = targets[host];
     if (!target) return null;
     
     return net.connect(target.port, target.host);
   });
+  
+var proxyServer = tls.createServer({ // HTTPS options
+  key: fs.readFileSync('./dummy.key'),
+  cert: fs.readFileSync('./dummy.crt')
+});
+proxyServer.on('secureConnection', function(stream) {
+  routingProxy.proxy(stream);
 });
 proxyServer.listen(443);
 

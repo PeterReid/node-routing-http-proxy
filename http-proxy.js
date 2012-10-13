@@ -1,4 +1,6 @@
 var HttpParser = require('./http-parser');
+var EventEmitter = require('events').EventEmitter;
+var util = require('util');
 
 // When we get lots of data before we know what the destination host is, we have to
 // buffer it. Limiting that prevents malformed data from filling up our memory.
@@ -7,33 +9,6 @@ var HttpParser = require('./http-parser');
 // In practice, this is roughly how long a URI is allowed.
 var PREHOST_MAX_LENGTH = 5*1024;
 
-/* Throttled console.error, since it is blocking */
-var reportError = (function() {
-  var windowChange;
-  var inWindow = 0;
-  var dropped = 0;
-  return function() {
-    if (!windowChange) {
-      windowChange = setTimeout(function() {
-        if (dropped > 0) {
-          console.error(dropped + ' error messages dropped to prevent spray.');
-        }
-        inWindow = 0;
-        dropped = 0;
-        windowChange = null;
-      }, 100);
-    }
-
-    inWindow++;
-    if (inWindow > 5) {
-      dropped++;
-    } else {
-      console.error.apply(console, arguments);
-    }
-  }
-})();
-
-
 function httpResponse(code, message) {
   return 'HTTP/1.1 ' + code + ' ' + message + '\r\n\r\n' + message;
 }
@@ -41,17 +16,40 @@ var HOST_NOT_FOUND_ERROR = httpResponse(404, "Host Not Found");
 var URI_TOO_LONG_ERROR = httpResponse(414, "URI Too Long");
 var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
 
+RoutingHttpProxy = module.exports = function(targetStreamCb) {
+  EventEmitter.call(this);
+  
+  this.targetStreamCb = targetStreamCb;
+};
+util.inherits(RoutingHttpProxy, EventEmitter)
+
+/*
+ * Proxy one HTTP stream into another.
+ * 
+ * stream :: Stream
+ *   readable stream that will send HTTP
+ * targetCb :: (host, uri) -> stream?
+ *   Provide an output stream for the given request. May return null.
+ *   'this' is set to the the input stream
+ */
+RoutingHttpProxy.prototype.proxy = function(stream) {
+  stream.httpParser = new HttpParser();
+  stream._routingHttpProxy = this;
+  stream.on('data', onPrehostData);
+}
+
+
 function onPrehostData(buffer) {
   var requestorStream = this;
 
   this.httpParser.advance(buffer);
   
   if (this.httpParser.done()) {
-    var targetStream = this._targetCb.call(this,
+    var targetStream = this._routingHttpProxy.targetStreamCb.call(this,
       this.httpParser.host, this.httpParser.uri);
     
     if (!targetStream) {
-      reportError('Invalid target: ' + this.httpParser.host);
+      this._routingHttpProxy.emit('error', new Error('Invalid target: ' + this.httpParser.host), this);
 
       requestorStream.end(HOST_NOT_FOUND_ERROR);
       return;
@@ -59,7 +57,8 @@ function onPrehostData(buffer) {
 
     var gotSomeFromTarget = false;
     targetStream.on('error', function(err) {
-      reportError('Target stream for ' + this.httpParser.host + this.httpParser.uri + ' failed.');
+      err.message = 'Target stream for ' + this.httpParser.host + this.httpParser.uri + ' failed. ' + err.message;
+      this._routingHttpProxy.emit('error', err, this);
       requestorStream.end(gotSomeFromTarget ? '' : TARGET_FAILED);
     });
     targetStream.once('data', function() {
@@ -77,25 +76,9 @@ function onPrehostData(buffer) {
 
   } else {
     if (this.httpParser.prehostLength > PREHOST_MAX_LENGTH) {
-      reportError('Shutting down stream for exceeding ', PREHOST_MAX_LENGTH);
+      this._routingHttpProxy.emit('error', new Error('Shutting down stream for exceeding ' + PREHOST_MAX_LENGTH), this);
       requestorStream.end(URI_TOO_LONG_ERROR);
       requestorStream.removeListener('data', onPrehostData);
     }
   }
 }
-
-/*
- * Proxy one HTTP stream into another.
- * 
- * stream :: Stream
- *   readable stream that will send HTTP
- * targetCb :: (host, uri) -> stream?
- *   Provide an output stream for the given request. May return null.
- *   'this' is set to the the input stream
- */
-var proxyStream = module.exports.proxyStream = function(stream, targetCb) {
-  stream.httpParser = new HttpParser();
-  stream._targetCb = targetCb;
-  stream.on('data', onPrehostData);
-}
-
