@@ -20,17 +20,17 @@ var TARGET_FAILED = httpResponse(502, "No Response From Inner Server");
  * targetStreamCb :: host -> stream?
  *   Provide an output stream for the given request. May return null.
  *   'this' is set to the the input stream
- */ 
+ */
 RoutingHttpProxy = module.exports = function(targetStreamCb) {
   EventEmitter.call(this);
-  
+
   this.targetStreamCb = targetStreamCb;
 };
 util.inherits(RoutingHttpProxy, EventEmitter)
 
 /*
  * Proxy one HTTP stream into another.
- * 
+ *
  * stream :: Stream
  *   readable stream that will send HTTP
  */
@@ -50,11 +50,11 @@ function onPrehostData(buffer) {
   var requestorStream = this;
 
   this.httpParser.advance(buffer);
-  
+
   if (this.httpParser.done()) {
     var targetStream = this._routingHttpProxy.targetStreamCb.call(this,
       this.httpParser.host, this.httpParser.uri);
-    
+
     if (!targetStream) {
       this._routingHttpProxy.emit('error', new Error('Invalid target: ' + this.httpParser.host), this);
 
@@ -79,6 +79,9 @@ function onPrehostData(buffer) {
     this.httpParser.prehostBuffers.forEach(function(buffer) {
       targetStream.write(buffer);
     });
+
+    this.emit('proxy', this.httpParser.host, this.httpParser.uri, requestorStream, targetStream);
+
     delete this.httpParser;
 
   } else {
