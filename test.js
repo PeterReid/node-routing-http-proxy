@@ -107,7 +107,7 @@ function fragmentWriting(socket) {
     
     setTimeout(function() {
       socket.emit('pump');
-    }, 100);
+    }, 10);
   });
 }
 
