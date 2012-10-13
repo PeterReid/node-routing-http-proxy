@@ -211,7 +211,7 @@ function onPrehostData(buffer) {
     requestorStream.prehostBuffers.forEach(function(buffer) {
       targetStream.write(buffer);
     });
-
+    delete requestorStream.prehostBuffers;
 
   } else {
     if (this.prehostLength > PREHOST_MAX_LENGTH) {
