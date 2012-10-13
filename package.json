@@ -1,0 +1,14 @@
+{
+  "name": "routing-http-proxy",
+  "description": "Routes HTTP(s) requests based on host",
+  "version": "0.1.0",
+  "author": {
+    "name": "Peter Reid",
+    "url": "https://github.com/PeterReid",
+    "email": "peter.d.reid@gmail.com"
+  },
+  "repository": {
+      "type": "git",
+      "url": "git://github.com/PeterReid/node-routing-http-proxy.git"
+  }
+}
