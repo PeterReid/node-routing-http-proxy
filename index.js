@@ -121,7 +121,7 @@ function onPrehostData(buffer) {
 
   this.httpParser.advance(buffer);
   
-  if (this.httpParser.host !== null) { 
+  if (this.httpParser.done()) {
     var target = targets[this.httpParser.host];
 
     if (!target) {

@@ -8,7 +8,8 @@ function toCharCodes(str) {
 }
 
 var hostChars = toCharCodes('\r\nHost: ');
-var endHostChar = '\r'.charCodeAt(0);
+var carriageReturnCode = '\r'.charCodeAt(0);
+var spaceCode = ' '.charCodeAt(0);
 
 function BufferIndex(buffer, index) {
   this.buffer = buffer;
@@ -16,6 +17,11 @@ function BufferIndex(buffer, index) {
 }
 
 var HttpParser = exports = module.exports = function() {
+  this.stage = 0;
+
+  this.uriStart = null;
+  this.uri = null;
+  
   this.prehostBuffers = [];
   this.prehostLength = 0;
   this.hostProgress = 0;
@@ -28,7 +34,33 @@ HttpParser.prototype.advance = function(buffer) {
   this.prehostLength += buffer.length;
   
   var bufferIdx = 0;
-  if (!this.hostStart) {
+  switch(this.stage) {
+  case 0:
+    // Looking for the beginning of the URI
+    while (bufferIdx < buffer.length) {
+      if (buffer[bufferIdx++] === spaceCode) {
+        this.uriStart = new BufferIndex(this.prehostBuffers.length-1, bufferIdx);
+        this.stage = 1;
+        break;
+      }
+    }
+    if (this.stage===0) break;
+    
+  case 1:
+    // Looking for the end of the URI
+    while (bufferIdx < buffer.length) {
+      if (buffer[bufferIdx] === spaceCode) {
+        this.uri = this.stringBetween(this.uriStart, 
+          new BufferIndex(this.prehostBuffers.length-1, bufferIdx));
+        this.stage = 2;
+        bufferIdx++;
+        break;
+      }
+      bufferIdx++;
+    }
+    if (this.stage===1) break;
+    
+  case 2:
     // Look for the beginning of the Host line.
     //
     // Note: this method only works because there are no duplicate characters in the
@@ -39,6 +71,7 @@ HttpParser.prototype.advance = function(buffer) {
         if (this.hostProgress == hostChars.length) {
           bufferIdx++; // Point to first character of host, not the space in ": "
           this.hostStart = new BufferIndex(this.prehostBuffers.length-1, bufferIdx);
+          this.stage = 3;
           break;
         }
       } else if (this.hostProgress > 0) {
@@ -46,20 +79,27 @@ HttpParser.prototype.advance = function(buffer) {
       }
       bufferIdx++;
     }
-  }
+  
+    if (this.stage===2) break;
 
-  if (this.hostStart) {
+  case 3:
     // Now see if we can find the \r that ends the "Host: " line.
     while (bufferIdx < buffer.length) {
-      if (buffer[bufferIdx] == endHostChar) {
+      if (buffer[bufferIdx] === carriageReturnCode) {
         this.host = this.stringBetween(this.hostStart, 
           new BufferIndex(this.prehostBuffers.length-1, bufferIdx));
+          this.stage++;
         break;
       }
       bufferIdx++;
     }
+    break;
   }
 };
+
+HttpParser.prototype.done = function() {
+  return this.stage === 4;
+}
 
 HttpParser.prototype.stringBetween = function(start, end) {
   var result = '';
@@ -67,7 +107,7 @@ HttpParser.prototype.stringBetween = function(start, end) {
     var buffer = this.prehostBuffers[b];
     var indexLow = b == start.buffer ? start.index : 0;
     var indexHigh = b == end.buffer ? end.index : buffer.length;
-    result += buffer.slice(indexLow, indexHigh);
+    result += buffer.slice(indexLow, indexHigh).toString();
   }
   return result;
 };
