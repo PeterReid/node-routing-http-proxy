@@ -53,7 +53,7 @@ function onPrehostData(buffer) {
 
   if (this.httpParser.done()) {
     var targetStream = this._routingHttpProxy.targetStreamCb.call(this,
-      this.httpParser.host, this.httpParser.uri);
+      this.httpParser.host);
 
     if (!targetStream) {
       this._routingHttpProxy.emit('error', new Error('Invalid target: ' + this.httpParser.host), this);
@@ -64,8 +64,8 @@ function onPrehostData(buffer) {
 
     var gotSomeFromTarget = false;
     targetStream.on('error', function(err) {
-      err.message = 'Target stream for ' + this.httpParser.host + ' failed. ' + err.message;
-      this._routingHttpProxy.emit('error', err, this);
+      err.message = 'Target stream for ' + requestorStream.httpParser.host + ' failed. ' + err.message;
+      requestorStream._routingHttpProxy.emit('error', err, this);
       requestorStream.end(gotSomeFromTarget ? '' : TARGET_FAILED);
     });
     targetStream.once('data', function() {
