@@ -64,7 +64,7 @@ function onPrehostData(buffer) {
 
     var gotSomeFromTarget = false;
     targetStream.on('error', function(err) {
-      err.message = 'Target stream for ' + this.httpParser.host + this.httpParser.uri + ' failed. ' + err.message;
+      err.message = 'Target stream for ' + this.httpParser.host + ' failed. ' + err.message;
       this._routingHttpProxy.emit('error', err, this);
       requestorStream.end(gotSomeFromTarget ? '' : TARGET_FAILED);
     });
@@ -82,7 +82,7 @@ function onPrehostData(buffer) {
 
     this.emit('proxy', this.httpParser.host, requestorStream, targetStream);
 
-    delete this.httpParser;
+    delete this.httpParser.prehostBuffers;
 
   } else {
     if (this.httpParser.prehostLength > PREHOST_MAX_LENGTH) {
